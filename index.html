@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Custom styles for loading states and animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="bg-white shadow-sm rounded-lg mb-6 p-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">🎱 Pool Tracker</h1>
+                <div id="auth-section" class="flex items-center gap-4">
+                    <!-- Auth buttons will be inserted here -->
+                </div>
+            </div>
+        </header>
+
+        <!-- Authentication View -->
+        <div id="auth-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto">
+                <h2 class="text-2xl font-semibold mb-6 text-center text-gray-800">Welcome to Pool Tracker</h2>
+                
+                <!-- Tabs -->
+                <div class="flex border-b mb-6">
+                    <button id="signin-tab" class="flex-1 py-2 px-4 text-center font-medium text-blue-600 border-b-2 border-blue-600">
+                        Sign In
+                    </button>
+                    <button id="signup-tab" class="flex-1 py-2 px-4 text-center font-medium text-gray-500 hover:text-gray-700">
+                        Sign Up
+                    </button>
+                </div>
+
+                <!-- Sign In Form -->
+                <div id="signin-form" class="space-y-4">
+                    <div>
+                        <label for="signin-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="signin-email" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label for="signin-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="signin-password" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="••••••••" required>
+                    </div>
+                    <button id="signin-btn" 
+                            class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition">
+                        Sign In
+                    </button>
+                    <div id="signin-error" class="text-red-600 text-sm mt-2 hidden"></div>
+                </div>
+
+                <!-- Sign Up Form -->
+                <div id="signup-form" class="space-y-4 hidden">
+                    <div>
+                        <label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="signup-email" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label for="signup-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="signup-password" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="•••••••• (min. 6 characters)" required minlength="6">
+                    </div>
+                    <div>
+                        <label for="signup-display-name" class="block text-sm font-medium text-gray-700 mb-1">Display Name (Optional)</label>
+                        <input type="text" id="signup-display-name" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Your Name">
+                    </div>
+                    <button id="signup-btn" 
+                            class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition">
+                        Sign Up
+                    </button>
+                    <div id="signup-error" class="text-red-600 text-sm mt-2 hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Application View -->
+        <div id="app-view" class="hidden">
+            <!-- User Info Card -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm text-gray-600">Logged in as</p>
+                        <p id="user-email" class="text-lg font-semibold text-gray-800"></p>
+                        <p id="user-display-name" class="text-sm text-gray-500"></p>
+                    </div>
+                    <button id="logout-btn" 
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition">
+                        Logout
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pools Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">My Pools</h2>
+                    <button id="create-pool-btn" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition">
+                        + Create Pool
+                    </button>
+                </div>
+                <div id="pools-list" class="space-y-3">
+                    <p class="text-gray-500 text-center py-8">No pools yet. Create your first pool to get started!</p>
+                </div>
+            </div>
+
+            <!-- Standings Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Standings</h2>
+                <div id="standings-list" class="space-y-2">
+                    <p class="text-gray-500 text-center py-8">Select a pool to view standings.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6">
+                <div class="flex items-center gap-3">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <span class="text-gray-700">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const SUPABASE_URL = window.SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
+
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            console.error('Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
+            document.getElementById('app').innerHTML = `
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <strong>Configuration Error:</strong> Missing Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY).
+                    Please configure these in your Cloudflare Pages environment settings.
+                </div>
+            `;
+        }
+
+        const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) || null;
+
+        // State management
+        let currentUser = null;
+        let currentPools = [];
+
+        // DOM Elements
+        const authView = document.getElementById('auth-view');
+        const appView = document.getElementById('app-view');
+        const authSection = document.getElementById('auth-section');
+        const signinTab = document.getElementById('signin-tab');
+        const signupTab = document.getElementById('signup-tab');
+        const signinForm = document.getElementById('signin-form');
+        const signupForm = document.getElementById('signup-form');
+        const signinBtn = document.getElementById('signin-btn');
+        const signupBtn = document.getElementById('signup-btn');
+        const signinEmail = document.getElementById('signin-email');
+        const signinPassword = document.getElementById('signin-password');
+        const signupEmail = document.getElementById('signup-email');
+        const signupPassword = document.getElementById('signup-password');
+        const signupDisplayName = document.getElementById('signup-display-name');
+        const signinError = document.getElementById('signin-error');
+        const signupError = document.getElementById('signup-error');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userEmail = document.getElementById('user-email');
+        const userDisplayName = document.getElementById('user-display-name');
+        const createPoolBtn = document.getElementById('create-pool-btn');
+        const poolsList = document.getElementById('pools-list');
+        const standingsList = document.getElementById('standings-list');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // Utility Functions
+        function showLoading() {
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+            setTimeout(() => {
+                element.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Tab Switching
+        signinTab.addEventListener('click', () => {
+            signinTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+            signinTab.classList.remove('text-gray-500');
+            signupTab.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+            signupTab.classList.add('text-gray-500');
+            signinForm.classList.remove('hidden');
+            signupForm.classList.add('hidden');
+        });
+
+        signupTab.addEventListener('click', () => {
+            signupTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+            signupTab.classList.remove('text-gray-500');
+            signinTab.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+            signinTab.classList.add('text-gray-500');
+            signupForm.classList.remove('hidden');
+            signinForm.classList.add('hidden');
+        });
+
+        // Authentication Functions
+        async function checkAuth() {
+            if (!supabase) return false;
+            
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                
+                if (session?.user) {
+                    currentUser = session.user;
+                    await loadUserProfile();
+                    showAppView();
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Auth check error:', error);
+                return false;
+            }
+        }
+
+        async function loadUserProfile() {
+            if (!supabase || !currentUser) return;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                    console.error('Error loading user profile:', error);
+                }
+
+                if (data) {
+                    userEmail.textContent = data.email || currentUser.email;
+                    userDisplayName.textContent = data.display_name ? `(${data.display_name})` : '';
+                } else {
+                    userEmail.textContent = currentUser.email;
+                    userDisplayName.textContent = '';
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+                userEmail.textContent = currentUser.email;
+            }
+        }
+
+        async function signIn() {
+            if (!supabase) {
+                showError(signinError, 'Supabase not configured');
+                return;
+            }
+
+            const email = signinEmail.value.trim();
+            const password = signinPassword.value;
+
+            if (!email || !password) {
+                showError(signinError, 'Please enter email and password');
+                return;
+            }
+
+            showLoading();
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+
+                currentUser = data.user;
+                await loadUserProfile();
+                showAppView();
+                signinEmail.value = '';
+                signinPassword.value = '';
+            } catch (error) {
+                showError(signinError, error.message || 'Sign in failed');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function signUp() {
+            if (!supabase) {
+                showError(signupError, 'Supabase not configured');
+                return;
+            }
+
+            const email = signupEmail.value.trim();
+            const password = signupPassword.value;
+            const displayName = signupDisplayName.value.trim();
+
+            if (!email || !password) {
+                showError(signupError, 'Please enter email and password');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError(signupError, 'Password must be at least 6 characters');
+                return;
+            }
+
+            showLoading();
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            display_name: displayName || null
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                // Create user profile
+                if (data.user) {
+                    const { error: profileError } = await supabase
+                        .from('users')
+                        .insert({
+                            id: data.user.id,
+                            email: data.user.email,
+                            display_name: displayName || null
+                        });
+
+                    if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+                        console.error('Error creating user profile:', profileError);
+                    }
+                }
+
+                showError(signupError, 'Account created! Please check your email to verify your account, then sign in.', 'text-green-600');
+                signupEmail.value = '';
+                signupPassword.value = '';
+                signupDisplayName.value = '';
+                
+                // Switch to sign in tab
+                setTimeout(() => {
+                    signinTab.click();
+                }, 2000);
+            } catch (error) {
+                showError(signupError, error.message || 'Sign up failed');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function signOut() {
+            if (!supabase) return;
+
+            showLoading();
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+
+                currentUser = null;
+                currentPools = [];
+                showAuthView();
+            } catch (error) {
+                console.error('Sign out error:', error);
+                alert('Error signing out: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showAuthView() {
+            authView.classList.remove('hidden');
+            appView.classList.add('hidden');
+        }
+
+        function showAppView() {
+            authView.classList.add('hidden');
+            appView.classList.remove('hidden');
+            loadPools();
+        }
+
+        // Pool Management Functions
+        async function loadPools() {
+            if (!supabase || !currentUser) return;
+
+            showLoading();
+            try {
+                const { data, error } = await supabase
+                    .from('pool_members')
+                    .select(`
+                        pool_id,
+                        role,
+                        joined_at,
+                        pools (
+                            id,
+                            name,
+                            description,
+                            status,
+                            created_at
+                        )
+                    `)
+                    .eq('user_id', currentUser.id)
+                    .eq('pools.status', 'active')
+                    .order('joined_at', { ascending: false });
+
+                if (error) throw error;
+
+                currentPools = data || [];
+                renderPools();
+            } catch (error) {
+                console.error('Error loading pools:', error);
+                poolsList.innerHTML = '<p class="text-red-600 text-center py-4">Error loading pools. Please check your database setup.</p>';
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderPools() {
+            if (currentPools.length === 0) {
+                poolsList.innerHTML = '<p class="text-gray-500 text-center py-8">No pools yet. Create your first pool to get started!</p>';
+                return;
+            }
+
+            poolsList.innerHTML = currentPools.map(member => {
+                const pool = member.pools;
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-gray-800">${escapeHtml(pool.name)}</h3>
+                                ${pool.description ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(pool.description)}</p>` : ''}
+                                <div class="flex gap-2 mt-2">
+                                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">${member.role}</span>
+                                    <span class="text-xs text-gray-500">Joined ${formatDate(member.joined_at)}</span>
+                                </div>
+                            </div>
+                            <button onclick="viewPool('${pool.id}')" 
+                                    class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition">
+                                View
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewPool(poolId) {
+            // Placeholder for pool view functionality
+            alert('Pool view functionality coming soon! Pool ID: ' + poolId);
+        }
+
+        function createPool() {
+            const name = prompt('Enter pool name:');
+            if (!name || !name.trim()) return;
+
+            const description = prompt('Enter pool description (optional):') || null;
+
+            if (!supabase || !currentUser) return;
+
+            showLoading();
+            supabase
+                .from('pools')
+                .insert({
+                    name: name.trim(),
+                    description: description?.trim() || null,
+                    status: 'active'
+                })
+                .select()
+                .single()
+                .then(({ data: pool, error: poolError }) => {
+                    if (poolError) throw poolError;
+
+                    // Add creator as manager
+                    return supabase
+                        .from('pool_members')
+                        .insert({
+                            pool_id: pool.id,
+                            user_id: currentUser.id,
+                            role: 'manager'
+                        });
+                })
+                .then(({ error: memberError }) => {
+                    if (memberError) throw memberError;
+                    loadPools();
+                })
+                .catch(error => {
+                    console.error('Error creating pool:', error);
+                    alert('Error creating pool: ' + error.message);
+                })
+                .finally(() => {
+                    hideLoading();
+                });
+        }
+
+        // Utility Functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString();
+        }
+
+        // Event Listeners
+        signinBtn.addEventListener('click', signIn);
+        signupBtn.addEventListener('click', signUp);
+        logoutBtn.addEventListener('click', signOut);
+        createPoolBtn.addEventListener('click', createPool);
+
+        // Allow Enter key to submit forms
+        signinPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') signIn();
+        });
+        signupPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') signUp();
+        });
+
+        // Listen for auth state changes
+        if (supabase) {
+            supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    currentUser = session.user;
+                    loadUserProfile();
+                    showAppView();
+                } else if (event === 'SIGNED_OUT') {
+                    currentUser = null;
+                    currentPools = [];
+                    showAuthView();
+                }
+            });
+        }
+
+        // Initialize app
+        checkAuth().then(authenticated => {
+            if (!authenticated) {
+                showAuthView();
+            }
+        });
+    </script>
+</body>
+</html>
+
