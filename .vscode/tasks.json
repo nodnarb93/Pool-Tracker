@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start Local Server (Python)",
+            "type": "shell",
+            "command": "python",
+            "args": ["serve.py"],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "clear": true
+            },
+            "isBackground": true,
+            "runOptions": {
+                "runOn": "default"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Start Local Server (Node.js)",
+            "type": "shell",
+            "command": "node",
+            "args": ["serve.js"],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false,
+                "clear": true
+            },
+            "isBackground": true,
+            "runOptions": {
+                "runOn": "default"
+            }
+        }
+    ]
+}
+

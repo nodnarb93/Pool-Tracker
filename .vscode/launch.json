@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🚀 Launch Local Server (Python)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/serve.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "serverReadyAction": {
+                "pattern": "Server running at http://localhost:([0-9]+)/",
+                "uriFormat": "http://localhost:%s/index.local.html",
+                "action": "openExternally"
+            },
+            "presentation": {
+                "hidden": false,
+                "group": "",
+                "order": 1
+            }
+        },
+        {
+            "name": "🚀 Launch Local Server (Node.js)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/serve.js",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ]
+}
+

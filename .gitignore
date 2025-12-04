@@ -1,0 +1,33 @@
+# Local configuration (contains sensitive credentials)
+config.js
+test-credentials.js
+
+# Node modules (if you install any)
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/settings.json
+.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Design/Wireframe files
+Wireframes/
+
