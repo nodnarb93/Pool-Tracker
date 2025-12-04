@@ -3,11 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pool Tracker</title>
+    <title>Pool Tracker - Local</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Load local config for development -->
+    <!-- Load local config -->
     <script src="config.js"></script>
+    <!-- test-credentials.js disabled for debugging -->
+    <script>
+        // Prevent multiple initializations
+        let isInitializing = false;
+        
+        // Wait for DOM and config to be ready
+        function initAppWhenReady() {
+            // Prevent running multiple times
+            if (isInitializing || window.__appInitialized) {
+                return;
+            }
+            isInitializing = true;
+            
+            // Check if config is loaded
+            if (typeof window.SUPABASE_URL === 'undefined' || typeof window.SUPABASE_ANON_KEY === 'undefined') {
+                // Config not loaded yet, wait a bit and try again
+                isInitializing = false;
+                setTimeout(initAppWhenReady, 50);
+                return;
+            }
+
+            // Test credentials disabled for debugging
+            console.log('ℹ️ Auto-login disabled - manual login only');
+
+            // Initialize Supabase client
+            const SUPABASE_URL = window.SUPABASE_URL || '';
+            const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
+
+            // Debug: Log config values (remove in production)
+            console.log('SUPABASE_URL:', SUPABASE_URL ? 'Set' : 'Missing');
+            console.log('SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? 'Set' : 'Missing');
+
+            // Check if config is set
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes('YOUR_') || SUPABASE_ANON_KEY.includes('YOUR_')) {
+                if (document.getElementById('config-warning')) {
+                    document.getElementById('config-warning').classList.remove('hidden');
+                }
+                if (document.getElementById('app')) {
+                    document.getElementById('app').innerHTML = `
+                        <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded">
+                            <strong>Configuration Error:</strong> Please edit <code>config.js</code> and add your Supabase credentials.
+                            <br><br>
+                            <strong>Debug Info:</strong>
+                            <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
+                                <li>SUPABASE_URL: ${SUPABASE_URL ? 'Found' : 'Missing'}</li>
+                                <li>SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY ? 'Found' : 'Missing'}</li>
+                                <li>Config file path: <code>config.js</code> (should be in same directory)</li>
+                            </ul>
+                            <br>
+                            <strong>Steps:</strong>
+                            <ol class="list-decimal list-inside mt-2 space-y-1">
+                                <li>Open <code>config.js</code> in this directory</li>
+                                <li>Replace <code>YOUR_SUPABASE_URL_HERE</code> with your Supabase project URL</li>
+                                <li>Replace <code>YOUR_SUPABASE_ANON_KEY_HERE</code> with your Supabase anonymous key</li>
+                                <li>Refresh this page</li>
+                            </ol>
+                            <br>
+                            <p class="text-sm">You can find these values in your Supabase dashboard under Settings > API</p>
+                            <p class="text-sm mt-2">If config.js exists and has values, check the browser console for errors loading the file.</p>
+                        </div>
+                    `;
+                }
+                return; // Stop execution if config is missing
+            }
+
+            // Continue with app initialization
+            try {
+                initializeApp(SUPABASE_URL, SUPABASE_ANON_KEY);
+                window.__appInitialized = true;
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                // Fallback: show auth view if initialization fails
+                setTimeout(() => {
+                    const authViewEl = document.getElementById('auth-view');
+                    if (authViewEl) {
+                        authViewEl.classList.remove('hidden');
+                    }
+                }, 100);
+            }
+        }
+
+        // Start initialization when DOM is ready - but only once
+        if (!window.__initStarted) {
+            window.__initStarted = true;
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initAppWhenReady);
+            } else {
+                // DOM already loaded
+                initAppWhenReady();
+            }
+        }
+        
+        // Safety net: Ensure loading overlay is hidden and auth view is shown if nothing else happens
+        setTimeout(() => {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const authView = document.getElementById('auth-view');
+            const appView = document.getElementById('app-view');
+            
+            if (loadingOverlay && !loadingOverlay.classList.contains('hidden')) {
+                console.warn('Loading overlay still visible after 1 second, hiding it');
+                loadingOverlay.classList.add('hidden');
+            }
+            
+            if (authView && appView) {
+                const authHidden = authView.classList.contains('hidden');
+                const appHidden = appView.classList.contains('hidden');
+                if (authHidden && appHidden) {
+                    console.warn('Both views are hidden! Showing auth view as fallback.');
+                    authView.classList.remove('hidden');
+                    appView.classList.add('hidden');
+                }
+            }
+        }, 1000);
+    </script>
     <style>
         /* Custom styles for loading states and animations */
         .fade-in {
@@ -38,10 +152,22 @@
             </div>
         </header>
 
+        <!-- Configuration Warning (only shown if config is missing) -->
+        <div id="config-warning" class="hidden bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded mb-4">
+            <strong>Configuration Required:</strong> Please edit <code>config.js</code> and add your Supabase URL and Anon Key.
+        </div>
+
         <!-- Authentication View -->
         <div id="auth-view" class="hidden">
             <div class="bg-gray-800 rounded-lg shadow-md p-8 max-w-md mx-auto">
-                <h2 class="text-2xl font-semibold mb-6 text-center text-gray-100">Welcome to Pool Tracker</h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-100">Welcome to Pool Tracker</h2>
+                    <button id="clear-session-btn" 
+                            class="text-xs px-3 py-1 bg-red-900 text-red-200 rounded hover:bg-red-800 transition"
+                            title="Clear cached session if you're having login issues">
+                        🧹 Clear Session
+                    </button>
+                </div>
                 
                 <!-- Tabs -->
                 <div class="flex border-b border-gray-700 mb-6">
@@ -230,29 +356,27 @@
     </div>
 
     <script>
-        // Initialize Supabase client
-        const SUPABASE_URL = window.SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
-
-        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-            console.error('Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
-            document.getElementById('app').innerHTML = `
-                <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded">
-                    <strong>Configuration Error:</strong> Missing Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY).
-                    Please configure these in your Cloudflare Pages environment settings.
-                </div>
-            `;
+        function initializeApp(SUPABASE_URL, SUPABASE_ANON_KEY) {
+        // Prevent multiple initializations of the app
+        if (window.__appInitialized) {
+            console.warn('App already initialized, skipping...');
+            return;
         }
-
-        const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) || null;
+        
+        // Create Supabase client
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // State management
         let currentUser = null;
         let currentPools = [];
 
-        // DOM Elements
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
+        // DOM Elements - get them when needed, not at initialization
+        // (They might not exist yet when this function runs)
+        function getAuthView() { return document.getElementById('auth-view'); }
+        function getAppView() { return document.getElementById('app-view'); }
+        
+        const authView = getAuthView();
+        const appView = getAppView();
         const authSection = document.getElementById('auth-section');
         const signinTab = document.getElementById('signin-tab');
         const signupTab = document.getElementById('signup-tab');
@@ -282,14 +406,15 @@
 
         // Utility Functions
         function showLoading() {
-            loadingOverlay.classList.remove('hidden');
+            if (loadingOverlay) loadingOverlay.classList.remove('hidden');
         }
 
         function hideLoading() {
-            loadingOverlay.classList.add('hidden');
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
         }
 
         function showError(element, message) {
+            if (!element) return;
             element.textContent = message;
             element.classList.remove('hidden');
             setTimeout(() => {
@@ -298,44 +423,27 @@
         }
 
         // Tab Switching
-        signinTab.addEventListener('click', () => {
-            signinTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
-            signinTab.classList.remove('text-gray-400');
-            signupTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
-            signupTab.classList.add('text-gray-400');
-            signinForm.classList.remove('hidden');
-            signupForm.classList.add('hidden');
-        });
+        if (signinTab && signupTab) {
+            signinTab.addEventListener('click', () => {
+                signinTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
+                signinTab.classList.remove('text-gray-400');
+                signupTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
+                signupTab.classList.add('text-gray-400');
+                signinForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+            });
 
-        signupTab.addEventListener('click', () => {
-            signupTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
-            signupTab.classList.remove('text-gray-400');
-            signinTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
-            signinTab.classList.add('text-gray-400');
-            signupForm.classList.remove('hidden');
-            signinForm.classList.add('hidden');
-        });
-
-        // Authentication Functions
-        async function checkAuth() {
-            if (!supabase) return false;
-            
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) throw error;
-                
-                if (session?.user) {
-                    currentUser = session.user;
-                    await loadUserProfile();
-                    showAppView();
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                console.error('Auth check error:', error);
-                return false;
-            }
+            signupTab.addEventListener('click', () => {
+                signupTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
+                signupTab.classList.remove('text-gray-400');
+                signinTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
+                signinTab.classList.add('text-gray-400');
+                signupForm.classList.remove('hidden');
+                signinForm.classList.add('hidden');
+            });
         }
+
+        // No longer needed - removed for simplicity
 
         async function loadUserProfile() {
             if (!supabase || !currentUser) return;
@@ -347,7 +455,7 @@
                     .eq('id', currentUser.id)
                     .single();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                if (error && error.code !== 'PGRST116') {
                     console.error('Error loading user profile:', error);
                 }
 
@@ -371,53 +479,80 @@
                     }
 
                     // Update display
-                    userEmail.textContent = currentUser.email;
-                    userDisplayName.textContent = displayName ? `(${displayName})` : '';
-                } else if (data) {
+                    if (userEmail) {
+                        userEmail.textContent = currentUser.email;
+                    }
+                    if (userDisplayName) {
+                        userDisplayName.textContent = displayName ? `(${displayName})` : '';
+                    }
+                } else if (data && userEmail) {
                     userEmail.textContent = data.email || currentUser.email;
-                    userDisplayName.textContent = data.display_name ? `(${data.display_name})` : '';
-                } else {
+                    if (userDisplayName) {
+                        userDisplayName.textContent = data.display_name ? `(${data.display_name})` : '';
+                    }
+                } else if (userEmail) {
                     userEmail.textContent = currentUser.email;
-                    userDisplayName.textContent = '';
                 }
             } catch (error) {
                 console.error('Error loading user profile:', error);
-                userEmail.textContent = currentUser.email;
+                if (userEmail) userEmail.textContent = currentUser.email;
             }
         }
 
+        // SIMPLE SIGN IN - No fancy stuff, just basic Supabase auth
         async function signIn() {
-            if (!supabase) {
-                showError(signinError, 'Supabase not configured');
-                return;
-            }
-
-            const email = signinEmail.value.trim();
-            const password = signinPassword.value;
+            const email = signinEmail?.value?.trim();
+            const password = signinPassword?.value;
 
             if (!email || !password) {
                 showError(signinError, 'Please enter email and password');
                 return;
             }
 
-            showLoading();
+            if (!supabase) {
+                showError(signinError, 'Not connected to database');
+                return;
+            }
+
+            if (signinBtn) signinBtn.disabled = true;
+            showError(signinError, 'Signing in...');
+
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password
-                });
-
-                if (error) throw error;
-
-                currentUser = data.user;
-                await loadUserProfile();
-                showAppView();
-                signinEmail.value = '';
-                signinPassword.value = '';
+                // First, check if there's an existing session and clear it AGGRESSIVELY
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    console.log('Clearing existing session before login');
+                    
+                    // Use the SAME aggressive clearing as the Clear Session button
+                    for (let i = localStorage.length - 1; i >= 0; i--) {
+                        const key = localStorage.key(i);
+                        if (key) localStorage.removeItem(key);
+                    }
+                    sessionStorage.clear();
+                    await supabase.auth.signOut();
+                    
+                    // Give it a moment to clear
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                // Now sign in
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                // Success - the onAuthStateChange listener will handle the rest
+                if (signinEmail) signinEmail.value = '';
+                if (signinPassword) signinPassword.value = '';
+                
             } catch (error) {
-                showError(signinError, error.message || 'Sign in failed');
-            } finally {
-                hideLoading();
+                console.error('Sign in error:', error);
+                let msg = 'Sign in failed';
+                if (error.message) msg = error.message;
+                if (error.status === 429) msg = 'Too many attempts. Wait a few minutes.';
+                showError(signinError, msg);
+                if (signinBtn) signinBtn.disabled = false;
             }
         }
 
@@ -465,7 +600,7 @@
                             display_name: displayName || null
                         });
 
-                    if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+                    if (profileError && profileError.code !== '23505') {
                         console.error('Error creating user profile:', profileError);
                     }
                 }
@@ -477,7 +612,7 @@
                 
                 // Switch to sign in tab
                 setTimeout(() => {
-                    signinTab.click();
+                    if (signinTab) signinTab.click();
                 }, 2000);
             } catch (error) {
                 showError(signupError, error.message || 'Sign up failed');
@@ -509,34 +644,46 @@
             }
         }
 
+        // SIMPLE SIGN OUT
         async function signOut() {
-            if (!supabase) return;
-
-            showLoading();
-            try {
-                const { error } = await supabase.auth.signOut();
-                if (error) throw error;
-
-                currentUser = null;
-                currentPools = [];
-                showAuthView();
-            } catch (error) {
-                console.error('Sign out error:', error);
-                alert('Error signing out: ' + error.message);
-            } finally {
-                hideLoading();
+            if (supabase) {
+                await supabase.auth.signOut();
             }
+            // The onAuthStateChange listener will handle the rest
         }
 
         function showAuthView() {
-            authView.classList.remove('hidden');
-            appView.classList.add('hidden');
+            console.log('showAuthView called');
+            const authViewEl = document.getElementById('auth-view');
+            const appViewEl = document.getElementById('app-view');
+            console.log('authViewEl:', authViewEl);
+            console.log('appViewEl:', appViewEl);
+            if (authViewEl) {
+                authViewEl.classList.remove('hidden');
+                console.log('Auth view shown - classList:', authViewEl.classList.toString());
+            } else {
+                console.error('auth-view element not found!');
+            }
+            if (appViewEl) {
+                appViewEl.classList.add('hidden');
+                console.log('App view hidden - classList:', appViewEl.classList.toString());
+            } else {
+                console.error('app-view element not found!');
+            }
         }
 
         function showAppView() {
-            authView.classList.add('hidden');
-            appView.classList.remove('hidden');
-            loadPools();
+            console.log('showAppView called');
+            const authViewEl = document.getElementById('auth-view');
+            const appViewEl = document.getElementById('app-view');
+            if (authViewEl) authViewEl.classList.add('hidden');
+            if (appViewEl) {
+                appViewEl.classList.remove('hidden');
+                console.log('App view shown');
+                loadPools();
+            } else {
+                console.error('app-view element not found!');
+            }
         }
 
         // Pool Management Functions
@@ -585,6 +732,8 @@
         }
 
         function renderPools() {
+            if (!poolsList) return;
+            
             if (currentPools.length === 0) {
                 poolsList.innerHTML = '<p class="text-gray-400 text-center py-8">No pools joined or created yet. Click "Create Pool" to get started!</p>';
                 return;
@@ -642,7 +791,7 @@
             }
         }
 
-        function createPool() {
+        async function createPool() {
             const nameInput = document.getElementById('pool-name-input');
             const descriptionInput = document.getElementById('pool-description-input');
             
@@ -656,42 +805,114 @@
 
             const description = descriptionInput ? descriptionInput.value.trim() : null;
 
-            if (!supabase || !currentUser) return;
+            if (!supabase || !currentUser) {
+                alert('Error: Not authenticated or Supabase not configured');
+                return;
+            }
 
             hideCreatePoolModal();
             showLoading();
-            supabase
-                .from('pools')
-                .insert({
-                    name: name,
-                    description: description || null,
-                    status: 'active'
-                })
-                .select()
-                .single()
-                .then(({ data: pool, error: poolError }) => {
-                    if (poolError) throw poolError;
-
-                    // Add creator as manager
-                    return supabase
-                        .from('pool_members')
+            
+            let createdPoolId = null;
+            
+            try {
+                // Step 0: Ensure user profile exists (should already exist, but double-check)
+                const { data: userProfile, error: profileError } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('id', currentUser.id)
+                    .single();
+                
+                if (profileError && profileError.code !== 'PGRST116') {
+                    console.warn('User profile check failed:', profileError);
+                    // Try to create the profile
+                    const { error: createProfileError } = await supabase
+                        .from('users')
                         .insert({
-                            pool_id: pool.id,
-                            user_id: currentUser.id,
-                            role: 'manager'
+                            id: currentUser.id,
+                            email: currentUser.email,
+                            display_name: currentUser.user_metadata?.display_name || null
                         });
-                })
-                .then(({ error: memberError }) => {
-                    if (memberError) throw memberError;
-                    loadPools();
-                })
-                .catch(error => {
-                    console.error('Error creating pool:', error);
-                    alert('Error creating pool: ' + error.message);
-                })
-                .finally(() => {
-                    hideLoading();
-                });
+                    
+                    if (createProfileError && createProfileError.code !== '23505') {
+                        console.error('Failed to create user profile:', createProfileError);
+                        throw new Error('User profile issue. Please try logging out and back in.');
+                    }
+                }
+                
+                // Step 1: Create the pool
+                console.log('Creating pool:', name);
+                const { data: pool, error: poolError } = await supabase
+                    .from('pools')
+                    .insert({
+                        name: name,
+                        description: description || null,
+                        status: 'active'
+                    })
+                    .select()
+                    .single();
+
+                if (poolError) {
+                    console.error('Error creating pool:', poolError);
+                    throw new Error(`Failed to create pool: ${poolError.message || poolError.code || 'Unknown error'}`);
+                }
+
+                if (!pool || !pool.id) {
+                    throw new Error('Pool was created but no ID was returned');
+                }
+
+                createdPoolId = pool.id;
+                console.log('Pool created successfully with ID:', createdPoolId);
+
+                // Step 2: Add creator as manager
+                console.log('Adding user as manager to pool:', createdPoolId);
+                const { data: memberData, error: memberError } = await supabase
+                    .from('pool_members')
+                    .insert({
+                        pool_id: createdPoolId,
+                        user_id: currentUser.id,
+                        role: 'manager'
+                    })
+                    .select()
+                    .single();
+
+                if (memberError) {
+                    console.error('Error adding user as manager:', memberError);
+                    // Clean up: delete the orphaned pool
+                    console.log('Cleaning up orphaned pool:', createdPoolId);
+                    await supabase
+                        .from('pools')
+                        .delete()
+                        .eq('id', createdPoolId);
+                    
+                    // Provide helpful error message
+                    let errorMsg = `Failed to add you as manager: ${memberError.message || memberError.code || 'Unknown error'}`;
+                    if (memberError.code === '42501' || memberError.message?.includes('permission')) {
+                        errorMsg += '\n\nThis might be a Row Level Security (RLS) policy issue. Please check your database policies.';
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                console.log('Successfully added user as manager');
+                
+                // Step 3: Reload pools list
+                await loadPools();
+                console.log('Pool creation completed successfully');
+                
+            } catch (error) {
+                console.error('Error in createPool:', error);
+                // Re-show the modal so user can try again
+                showCreatePoolModal();
+                // Restore the input values
+                if (nameInput) nameInput.value = name;
+                if (descriptionInput) descriptionInput.value = description || '';
+                
+                // Show detailed error message
+                const errorMessage = error.message || 'Unknown error occurred';
+                alert(`Error creating pool:\n\n${errorMessage}\n\nPlease try again.`);
+            } finally {
+                hideLoading();
+            }
         }
 
         // Utility Functions
@@ -707,15 +928,30 @@
             return date.toLocaleDateString();
         }
 
+        // CLEAR SESSION - Nukes everything and reloads
+        function clearSession() {
+            // Clear all localStorage keys
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key) localStorage.removeItem(key);
+            }
+            sessionStorage.clear();
+            window.location.reload();
+        }
+        
         // Event Listeners
-        signinBtn.addEventListener('click', signIn);
-        signupBtn.addEventListener('click', signUp);
-        googleSigninBtn.addEventListener('click', signInWithGoogle);
-        googleSignupBtn.addEventListener('click', signInWithGoogle);
-        logoutBtn.addEventListener('click', signOut);
-        createPoolBtn.addEventListener('click', showCreatePoolModal);
+        if (signinBtn) signinBtn.addEventListener('click', signIn);
+        if (signupBtn) signupBtn.addEventListener('click', signUp);
+        if (googleSigninBtn) googleSigninBtn.addEventListener('click', signInWithGoogle);
+        if (googleSignupBtn) googleSignupBtn.addEventListener('click', signInWithGoogle);
+        if (logoutBtn) logoutBtn.addEventListener('click', signOut);
+        if (createPoolBtn) createPoolBtn.addEventListener('click', showCreatePoolModal);
         if (cancelPoolBtn) cancelPoolBtn.addEventListener('click', hideCreatePoolModal);
         if (submitPoolBtn) submitPoolBtn.addEventListener('click', createPool);
+        
+        // Clear session button
+        const clearSessionBtn = document.getElementById('clear-session-btn');
+        if (clearSessionBtn) clearSessionBtn.addEventListener('click', clearSession);
         
         // Allow Enter key to submit pool creation form
         if (poolNameInput) {
@@ -738,34 +974,92 @@
         }
 
         // Allow Enter key to submit forms
-        signinPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') signIn();
-        });
-        signupPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') signUp();
-        });
-
-        // Listen for auth state changes
-        if (supabase) {
-            supabase.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN' && session) {
-                    currentUser = session.user;
-                    await loadUserProfile();
-                    showAppView();
-                } else if (event === 'SIGNED_OUT') {
-                    currentUser = null;
-                    currentPools = [];
-                    showAuthView();
-                }
+        if (signinPassword) {
+            signinPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') signIn();
+            });
+        }
+        if (signupPassword) {
+            signupPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') signUp();
             });
         }
 
-        // Initialize app
-        checkAuth().then(authenticated => {
-            if (!authenticated) {
+        // AUTH STATE CHANGE LISTENER - This is the key to making Supabase auth work
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth event:', event);
+            
+            if (event === 'SIGNED_IN' && session) {
+                currentUser = session.user;
+                await loadUserProfile();
+                showAppView();
+                if (signinBtn) signinBtn.disabled = false;
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                currentPools = [];
                 showAuthView();
             }
         });
+
+        // INITIALIZE - For local dev, always start fresh to avoid stale sessions
+        (async function initApp() {
+            console.log('Initializing app...');
+            
+            // For LOCAL DEVELOPMENT: Clear any cached sessions on page load
+            // This prevents stale sessions after server restarts
+            const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            if (isLocalDev) {
+                console.log('🧹 Local dev mode: Clearing any cached sessions on startup');
+                
+                // Use the SAME aggressive clearing as the Clear Session button
+                // Clear all localStorage
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key) localStorage.removeItem(key);
+                }
+                // Clear sessionStorage
+                sessionStorage.clear();
+                
+                // Call signOut too for good measure
+                await supabase.auth.signOut();
+                
+                showAuthView();
+                hideLoading();
+            } else {
+                // PRODUCTION: Try to restore session if valid
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    
+                    if (session) {
+                        console.log('Found cached session, validating...');
+                        const { data: { user }, error: userError } = await supabase.auth.getUser();
+                        
+                        if (userError || !user) {
+                            console.warn('Cached session is invalid, clearing it');
+                            await supabase.auth.signOut();
+                            showAuthView();
+                        } else {
+                            console.log('Session is valid, logging in');
+                            currentUser = user;
+                            await loadUserProfile();
+                            showAppView();
+                        }
+                    } else {
+                        showAuthView();
+                    }
+                } catch (err) {
+                    console.error('Initialization error:', err);
+                    showAuthView();
+                }
+                hideLoading();
+            }
+        })();
+        
+        // Mark app as initialized
+        window.__appInitialized = true;
+        console.log('App initialization complete');
+        } // End of initializeApp function
     </script>
 </body>
 </html>
